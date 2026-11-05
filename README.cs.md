@@ -266,6 +266,10 @@ veřejně známý.
 Projekt není nijak spojen se společnostmi Philips ani TP Vision; Philips je ochranná
 známka společnosti Koninklijke Philips N.V.
 
+## Autor
+
+Miloslav Brada – [miloslavbrada.cz](https://miloslavbrada.cz)
+
 ## Licence
 
 Licencováno podle vaší volby pod [Apache License 2.0](LICENSE-APACHE) nebo

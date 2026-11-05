@@ -268,6 +268,10 @@ publicly known.
 This project is not affiliated with Philips or TP Vision in any way; Philips is
 a trademark of Koninklijke Philips N.V.
 
+## Author
+
+Miloslav Brada – [miloslavbrada.cz](https://miloslavbrada.cz)
+
 ## License
 
 Licensed under either of [Apache License, Version 2.0](LICENSE-APACHE) or
