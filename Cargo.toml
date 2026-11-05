@@ -1,0 +1,38 @@
+[package]
+name = "philips-controller"
+version = "0.1.0"
+edition = "2024"
+# Minimum dané závislostmi (egui 0.37)
+rust-version = "1.95"
+description = "Network remote control for Philips TVs (JointSpace API) with a tray icon and global X11 hotkeys"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/mbrada/philips-controller"
+readme = "README.md"
+keywords = ["philips", "tv", "remote-control", "jointspace", "egui"]
+categories = ["gui", "network-programming"]
+
+[dependencies]
+anyhow = "1.0.104"
+base64 = "0.23.1"
+digest_auth = "0.3.1"
+dirs = "7.0.0"
+eframe = "0.37.0"
+egui = { version = "0.37", features = ["monochrome_emoji_fonts"] }
+hmac = "0.13.0"
+if-addrs = "0.15.0"
+rand = "0.10.3"
+reqwest = { version = "0.13.5", default-features = false, features = ["blocking", "json", "rustls"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+sha1 = "0.11.0"
+tray-icon = "0.26.1"
+
+# tray-icon na Linuxu potřebuje běžící GTK smyčku ve vlastním vlákně
+[target.'cfg(target_os = "linux")'.dependencies]
+gtk = "0.18"
+x11-dl = "2.21"
+x11rb = "0.13"
+
+[profile.release]
+strip = true
+lto = "thin"
