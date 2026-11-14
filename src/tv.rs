@@ -171,6 +171,15 @@ impl PhilipsTv {
             })
     }
 
+    /// MAC adresy všech síťových rozhraní TV (kabel i Wi-Fi), i toho, které právě
+    /// není připojené.
+    pub fn network_macs(&mut self) -> Result<Vec<String>> {
+        let resp = self
+            .request(Method::GET, "network/devices", None)?
+            .error_for_status()?;
+        Ok(parse_network_macs(&resp.json()?))
+    }
+
     pub fn set_power_state(&mut self, state: &str) -> Result<()> {
         self.post("powerstate", &json!({ "powerstate": state }))
     }
@@ -379,6 +388,18 @@ fn parse_system(system: &Value, legacy: bool) -> SystemInfo {
     }
 }
 
+/// Seznam rozhraní z `network/devices`, např.
+/// `[{"id": "eth0", "mac": "…", "type": "Ethernet", "wake-on-lan": "Enabled"}, …]`.
+fn parse_network_macs(devices: &Value) -> Vec<String> {
+    devices
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|device| device["mac"].as_str())
+        .map(str::to_owned)
+        .collect()
+}
+
 fn device_spec(device_id: &str) -> Value {
     json!({
         "device_name": "PhilipsController",
@@ -427,6 +448,22 @@ mod tests {
         assert_eq!(info.name, "55PUS7502/12");
         assert_eq!(info.api_version, 6);
         assert!(info.secure);
+    }
+
+    #[test]
+    fn parses_macs_of_all_network_interfaces() {
+        // Adresy z rozsahu pro dokumentaci (RFC 7042).
+        let devices = json!([
+            { "id": "wifi0", "mac": "00:00:5E:00:53:01", "type": "Wifi", "wake-on-lan": "Disabled" },
+            { "id": "eth0", "mac": "00:00:5E:00:53:02", "type": "Ethernet",
+              "ip": "192.0.2.25", "wake-on-lan": "Enabled" },
+            { "id": "unknown" },
+        ]);
+        assert_eq!(
+            parse_network_macs(&devices),
+            ["00:00:5E:00:53:01", "00:00:5E:00:53:02"]
+        );
+        assert!(parse_network_macs(&json!({ "error": "not found" })).is_empty());
     }
 
     #[test]

@@ -6,7 +6,7 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 
 use crate::i18n::{Lang, tr, trf};
 use crate::tv::Credentials;
@@ -51,8 +51,11 @@ const DEFAULT_WINDOW_KEYS: [(&str, &str); 14] = [
 pub struct Config {
     pub host: Option<String>,
     pub name: Option<String>,
-    /// MAC adresa pro Wake-on-LAN, zjištěná z ARP tabulky po prvním připojení.
-    pub mac: Option<String>,
+    /// MAC adresy televize pro Wake-on-LAN – kabel i Wi-Fi, protože TV může mezi nimi
+    /// přecházet. Zjišťují se po připojení z API televize a z ARP tabulky. Starší verze
+    /// ukládaly jedinou adresu do `mac`, ta se načte také.
+    #[serde(default, alias = "mac", deserialize_with = "one_or_many")]
+    pub macs: Vec<String>,
     pub credentials: Option<Credentials>,
     #[serde(default = "default_hotkeys")]
     pub hotkeys: BTreeMap<String, String>,
@@ -84,7 +87,7 @@ impl Default for Config {
         Self {
             host: None,
             name: None,
-            mac: None,
+            macs: Vec::new(),
             credentials: None,
             hotkeys: default_hotkeys(),
             window_keys: default_window_keys(),
@@ -93,6 +96,21 @@ impl Default for Config {
             load_error: None,
         }
     }
+}
+
+/// Přijme jednu adresu (`"mac": "…"` ze starších verzí), seznam i `null`.
+fn one_or_many<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Vec<String>, D::Error> {
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum OneOrMany {
+        One(String),
+        Many(Vec<String>),
+    }
+    Ok(match Option::<OneOrMany>::deserialize(deserializer)? {
+        None => Vec::new(),
+        Some(OneOrMany::One(mac)) => vec![mac],
+        Some(OneOrMany::Many(macs)) => macs,
+    })
 }
 
 fn default_hotkeys() -> BTreeMap<String, String> {
@@ -159,7 +177,7 @@ impl Config {
             Some(mut stored) => {
                 stored.host = self.host.clone();
                 stored.name = self.name.clone();
-                stored.mac = self.mac.clone();
+                stored.macs = self.macs.clone();
                 stored.credentials = self.credentials.clone();
                 stored.layout = self.layout;
                 stored
@@ -334,5 +352,34 @@ mod tests {
         assert_eq!(config.layout, Layout::Minimal);
         let config: Config = serde_json::from_str(r#"{ "layout": "full" }"#).unwrap();
         assert_eq!(config.layout, Layout::Full);
+    }
+
+    #[test]
+    fn single_mac_from_older_version_is_loaded() {
+        let config: Config = serde_json::from_str(r#"{ "mac": "00:00:5e:00:53:2a" }"#).unwrap();
+        assert_eq!(config.macs, ["00:00:5e:00:53:2a"]);
+        let config: Config = serde_json::from_str(r#"{ "mac": null }"#).unwrap();
+        assert!(config.macs.is_empty());
+        let config: Config = serde_json::from_str(r#"{ "host": "192.0.2.10" }"#).unwrap();
+        assert!(config.macs.is_empty());
+    }
+
+    #[test]
+    fn saving_replaces_old_mac_with_list() {
+        let file = TestFile::new("macs");
+        let path = &file.0;
+        fs::write(
+            path,
+            r#"{ "host": "192.0.2.10", "mac": "00:00:5e:00:53:01" }"#,
+        )
+        .unwrap();
+        let mut config = Config::load_from(path);
+        config.macs.push("00:00:5e:00:53:02".into());
+        config.save_to(path).unwrap();
+
+        let text = fs::read_to_string(path).unwrap();
+        assert!(!text.contains("\"mac\""));
+        let saved = Config::load_from(path);
+        assert_eq!(saved.macs, ["00:00:5e:00:53:01", "00:00:5e:00:53:02"]);
     }
 }

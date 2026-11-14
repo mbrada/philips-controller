@@ -24,6 +24,8 @@ doing.
   arranged like a Philips remote, which adds playback controls, Source, Search, the
   colour keys, Info, Options, channels, Ambilight, digits, subtitles and teletext.
 - Power on uses Wake-on-LAN + `powerstate`, so it wakes the TV even from deep standby.
+  The magic packet goes to both the wired and the Wi-Fi interface, so it keeps working
+  when the TV switches between them.
 - Tray icon with a quick menu (show / hide, power on, power off, mute, quit).
   Closing the window only hides it to the tray.
 - Keyboard control in the window: arrows, Enter, Backspace / Esc, Space, + / −, M and
@@ -75,9 +77,9 @@ philips-controller --hidden   # tray icon only (for autostart)
 
 On the first start the remote scans the network by itself. Pick your TV under
 **Connection** (or type its IP address there). Newer TVs then need pairing: press
-**Pair** and type in the PIN shown on the TV. The TV address, its MAC address for
-Wake-on-LAN (taken from the ARP table) and the pairing credentials are saved, so next
-time the remote connects right away.
+**Pair** and type in the PIN shown on the TV. The TV address, the MAC addresses of its
+network interfaces for Wake-on-LAN (taken from the TV's API and the ARP table) and the
+pairing credentials are saved, so next time the remote connects right away.
 
 To start it after login, a `.desktop` file in `~/.config/autostart/` is enough:
 
@@ -90,10 +92,10 @@ Exec=philips-controller --hidden
 
 ## Configuration
 
-`~/.config/philips-controller/config.json` holds the TV address, the MAC address for
-Wake-on-LAN, the pairing credentials, the button `layout`, the keys in the window
-(`window_keys`), the global `hotkeys` and the optional `language`. The file contains the
-key that controls the TV, so the app saves it with `0600` permissions.
+`~/.config/philips-controller/config.json` holds the TV address, the MAC addresses
+for Wake-on-LAN (`macs`), the pairing credentials, the button `layout`, the keys in the
+window (`window_keys`), the global `hotkeys` and the optional `language`. The file
+contains the key that controls the TV, so the app saves it with `0600` permissions.
 
 ```json
 "language": "en",

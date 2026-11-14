@@ -372,14 +372,10 @@ impl Worker {
         if self.config.host.as_deref() != Some(host) {
             // Jiná TV – údaje té předchozí neplatí, zkratky zůstávají.
             self.config.host = Some(host.to_owned());
-            self.config.mac = None;
+            self.config.macs.clear();
             self.config.credentials = None;
         }
         self.config.name = Some(info.name.clone());
-        if let Some(mac) = wol::mac_from_arp(host) {
-            self.config.mac = Some(mac);
-        }
-        self.save_config();
 
         let mut tv = PhilipsTv::new(host, info, self.config.credentials.clone())?;
         // Ověříme, že uložené párování pořád platí.
@@ -389,8 +385,9 @@ impl Worker {
         {
             tv = PhilipsTv::new(host, tv.info().clone(), None)?;
             self.config.credentials = None;
-            self.save_config();
         }
+        learn_macs(&mut self.config.macs, &mut tv);
+        self.save_config();
 
         self.emit(Event::Connected {
             host: host.to_owned(),
@@ -428,6 +425,8 @@ impl Worker {
         };
         let credentials = tv.pair_grant(session, pin)?;
         self.config.credentials = Some(credentials);
+        // Seznam rozhraní TV vydá až po spárování.
+        learn_macs(&mut self.config.macs, tv);
         self.save_config();
         self.emit(Event::Paired);
         Ok(())
@@ -472,8 +471,8 @@ impl Worker {
             .ok_or_else(|| anyhow!(tr("Není známá žádná TV", "No TV is known yet")))?;
 
         self.emit(Event::Busy(tr("Zapínám TV…", "Turning the TV on…").into()));
-        if let Some(mac) = &self.config.mac {
-            wol::wake(mac, &host)?;
+        if !self.config.macs.is_empty() {
+            wol::wake(&self.config.macs, &host)?;
         }
 
         let deadline = Instant::now() + POWER_ON_TIMEOUT;
@@ -508,7 +507,7 @@ impl Worker {
             thread::sleep(Duration::from_millis(700));
         }
 
-        if self.config.mac.is_none() && !self.is_online() {
+        if self.config.macs.is_empty() && !self.is_online() {
             anyhow::bail!(tr(
                 "TV neodpovídá a neznám její MAC adresu pro Wake-on-LAN",
                 "The TV is not responding and its MAC address for Wake-on-LAN is unknown",
@@ -520,6 +519,19 @@ impl Worker {
              in the TV settings?",
         ))
     }
+}
+
+/// Zjistí MAC adresy pro Wake-on-LAN: z API televize všechna rozhraní (kabel i Wi-Fi,
+/// i to právě nepřipojené), z ARP tabulky to, přes které TV zrovna komunikuje.
+fn learn_macs(macs: &mut Vec<String>, tv: &mut PhilipsTv) {
+    let from_tv = if tv.needs_pairing() {
+        Vec::new()
+    } else {
+        // Starší televize seznam rozhraní nemají – pak stačí ARP.
+        tv.network_macs().unwrap_or_default()
+    };
+    let from_arp = wol::mac_from_arp(tv.host());
+    *macs = wol::merge_macs(macs, &from_tv, from_arp.as_deref());
 }
 
 #[cfg(test)]

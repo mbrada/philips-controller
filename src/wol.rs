@@ -6,17 +6,20 @@ use anyhow::{Result, anyhow};
 
 use crate::i18n::trf;
 
-pub fn wake(mac: &str, host: &str) -> Result<()> {
-    let mac = parse_mac(mac).ok_or_else(|| {
-        anyhow!(trf!(
-            "neplatná MAC adresa {mac}",
-            "invalid MAC address {mac}"
-        ))
-    })?;
-    let mut packet = vec![0xFF; 6];
-    for _ in 0..16 {
-        packet.extend_from_slice(&mac);
-    }
+/// Pošle magic packet na všechny MAC adresy televize – TV může být připojená kabelem
+/// i přes Wi-Fi a každé rozhraní se probouzí jen svou vlastní adresou.
+pub fn wake(macs: &[String], host: &str) -> Result<()> {
+    let macs = macs
+        .iter()
+        .map(|mac| {
+            parse_mac(mac).ok_or_else(|| {
+                anyhow!(trf!(
+                    "neplatná MAC adresa {mac}",
+                    "invalid MAC address {mac}"
+                ))
+            })
+        })
+        .collect::<Result<Vec<_>>>()?;
 
     let socket = UdpSocket::bind("0.0.0.0:0")?;
     socket.set_broadcast(true)?;
@@ -26,12 +29,45 @@ pub fn wake(mac: &str, host: &str) -> Result<()> {
         let [a, b, c, _] = ip.octets();
         targets.push(Ipv4Addr::new(a, b, c, 255));
     }
-    for target in targets {
-        for port in [9, 7] {
-            socket.send_to(&packet, (target, port))?;
+    for mac in macs {
+        let mut packet = vec![0xFF; 6];
+        for _ in 0..16 {
+            packet.extend_from_slice(&mac);
+        }
+        for target in &targets {
+            for port in [9, 7] {
+                socket.send_to(&packet, (*target, port))?;
+            }
         }
     }
     Ok(())
+}
+
+/// Spojí nově zjištěné MAC adresy s uloženými. Seznam z API televize obsahuje všechna její
+/// rozhraní, a proto uložené nahradí; ARP tabulka zná jen rozhraní, přes které TV právě
+/// komunikuje, takže se jen přidá. Adresy jsou sjednocené na malá písmena s dvojtečkami.
+pub fn merge_macs(known: &[String], from_tv: &[String], from_arp: Option<&str>) -> Vec<String> {
+    let base = if from_tv.is_empty() { known } else { from_tv };
+    let mut macs: Vec<String> = Vec::new();
+    for mac in base.iter().map(String::as_str).chain(from_arp) {
+        if let Some(mac) = normalize_mac(mac)
+            && !macs.contains(&mac)
+        {
+            macs.push(mac);
+        }
+    }
+    macs
+}
+
+fn normalize_mac(mac: &str) -> Option<String> {
+    let bytes = parse_mac(mac)?;
+    Some(
+        bytes
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<Vec<_>>()
+            .join(":"),
+    )
 }
 
 /// Najde MAC adresu v ARP tabulce jádra (jen Linux).
@@ -87,5 +123,41 @@ mod tests {
         );
         assert_eq!(find_in_arp_table(table, "192.0.2.20"), None);
         assert_eq!(find_in_arp_table(table, "10.0.0.1"), None);
+    }
+
+    #[test]
+    fn mac_list_from_tv_replaces_stored_one() {
+        // Uložená je jen Wi-Fi, TV teď hlásí Wi-Fi i kabel (velkými písmeny).
+        let known = vec!["00:00:5e:00:53:01".to_string()];
+        let from_tv = vec![
+            "00:00:5E:00:53:01".to_string(),
+            "00:00:5E:00:53:02".to_string(),
+        ];
+        assert_eq!(
+            merge_macs(&known, &from_tv, Some("00:00:5e:00:53:02")),
+            ["00:00:5e:00:53:01", "00:00:5e:00:53:02"]
+        );
+    }
+
+    #[test]
+    fn mac_from_arp_is_added_to_stored_ones() {
+        // Starší TV bez seznamu rozhraní: adresa z ARP se přidá, stará zůstane.
+        let known = vec!["00:00:5e:00:53:01".to_string()];
+        assert_eq!(
+            merge_macs(&known, &[], Some("00-00-5E-00-53-02")),
+            ["00:00:5e:00:53:01", "00:00:5e:00:53:02"]
+        );
+        assert_eq!(
+            merge_macs(&known, &[], Some("00:00:5e:00:53:01")),
+            ["00:00:5e:00:53:01"]
+        );
+        assert_eq!(merge_macs(&known, &[], None), ["00:00:5e:00:53:01"]);
+    }
+
+    #[test]
+    fn invalid_mac_is_rejected_before_sending() {
+        let macs = vec!["00:00:5e:00:53:01".to_string(), "nesmysl".to_string()];
+        let err = wake(&macs, "192.0.2.25").unwrap_err();
+        assert!(err.to_string().contains("nesmysl"));
     }
 }

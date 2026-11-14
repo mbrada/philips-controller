@@ -23,7 +23,7 @@ zkratkami pro X11, takže televizi ovládáte, aniž byste odbíhali od práce.
   hledání, barevná tlačítka, info, možnosti, kanály, Ambilight, číslice, titulky
   a teletext.
 - Zapnutí používá Wake-on-LAN + `powerstate`, takže televizi probudí i z hlubokého
-  standby.
+  standby. Magic packet jde na kabel i Wi-Fi, takže nevadí, když TV mezi nimi přejde.
 - Ikona v systémové liště (zobrazit / skrýt, zapnout, vypnout, ztlumit, ukončit).
   Křížek okno jen schová do lišty.
 - Ovládání klávesnicí v okně: šipky, Enter, Backspace / Esc, mezerník, + / −, M atd. –
@@ -74,9 +74,9 @@ philips-controller --hidden   # jen ikona v liště (pro autostart)
 
 Při prvním spuštění ovladač sám prohledá síť. Televizi vyberte v sekci **Připojení**
 (nebo tam zadejte její IP adresu). Novější televize je pak potřeba spárovat: stiskněte
-**Spárovat** a opište PIN z obrazovky. Adresa TV, její MAC adresa pro Wake-on-LAN
-(zjistí se z ARP tabulky) a přihlašovací údaje z párování se uloží, příště se ovladač
-připojí rovnou.
+**Spárovat** a opište PIN z obrazovky. Adresa TV, MAC adresy jejích síťových rozhraní
+pro Wake-on-LAN (zjistí se z API televize a z ARP tabulky) a přihlašovací údaje
+z párování se uloží, příště se ovladač připojí rovnou.
 
 Pro spuštění po přihlášení stačí `.desktop` soubor v `~/.config/autostart/`:
 
@@ -89,10 +89,10 @@ Exec=philips-controller --hidden
 
 ## Konfigurace
 
-`~/.config/philips-controller/config.json` – adresa TV, MAC pro Wake-on-LAN, údaje
-z párování, rozložení tlačítek `layout`, klávesy v okně `window_keys`, globální zkratky
-`hotkeys` a volitelně `language`. Soubor obsahuje klíč k ovládání televize, proto ho
-aplikace ukládá s právy `0600`.
+`~/.config/philips-controller/config.json` – adresa TV, MAC adresy pro Wake-on-LAN
+`macs`, údaje z párování, rozložení tlačítek `layout`, klávesy v okně `window_keys`,
+globální zkratky `hotkeys` a volitelně `language`. Soubor obsahuje klíč k ovládání
+televize, proto ho aplikace ukládá s právy `0600`.
 
 ```json
 "language": "cs",
