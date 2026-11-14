@@ -25,6 +25,11 @@ const RETRY_FIRST: Duration = Duration::from_secs(1);
 const RETRY_MAX: Duration = Duration::from_secs(15);
 /// Stisky během výpadku se řadí do fronty – každý nemusí znovu čekat na nedostupnou TV.
 const RETRY_ON_DEMAND_GAP: Duration = Duration::from_secs(2);
+/// YouTube na TV při skryté liště první stisk jen „probudí“ ovládání a akci provede až
+/// druhý. `Play` a `Pause` jen nastavují stav, takže je posíláme dvakrát – druhý stisk
+/// nic nevrátí zpátky (na rozdíl od `PlayPause` nebo OK, které přepínají).
+const SENT_TWICE: [&str; 2] = ["Play", "Pause"];
+const SECOND_PRESS_GAP: Duration = Duration::from_millis(300);
 
 pub enum Command {
     Discover,
@@ -247,7 +252,14 @@ impl Worker {
                 if pressed_at.elapsed() > KEY_MAX_AGE {
                     return;
                 }
-                let result = self.with_tv(|tv| tv.send_key(key));
+                let result = self.with_tv(|tv| {
+                    tv.send_key(key)?;
+                    if SENT_TWICE.contains(&key) {
+                        thread::sleep(SECOND_PRESS_GAP);
+                        tv.send_key(key)?;
+                    }
+                    Ok(())
+                });
                 self.report(result);
             }
             Command::PowerOn => {

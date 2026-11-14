@@ -247,6 +247,11 @@ The same for both sections; case-sensitive.
 | Other TV keys | `Standby` (toggles standby), `AmbilightOnOff`, `Subtitle`, `Teletext` |
 | Remote | `PowerOn` (Wake-on-LAN + power on), `PowerOff`, `ShowWindow` (shows the remote, hides it when active), `ToggleWindow` (show / hide) |
 
+`Play` and `Pause` are sent to the TV twice in a row. While a video is playing, the YouTube
+app only shows its control bar on the first press and acts on the second one; both keys
+only set a state, so the extra press does no harm elsewhere. `PlayPause` and `Confirm`
+toggle, so they are sent once – in YouTube, press them twice while a video is playing.
+
 ## Development
 
 ```sh

@@ -243,6 +243,11 @@ Stejné pro obě sekce; na velikosti písmen záleží.
 | Ostatní klávesy TV | `Standby` (přepne standby), `AmbilightOnOff`, `Subtitle`, `Teletext` |
 | Ovladač | `PowerOn` (Wake-on-LAN + zapnutí), `PowerOff`, `ShowWindow` (zobrazí ovladač, aktivní schová), `ToggleWindow` (zobrazí / schová) |
 
+`Play` a `Pause` se do TV posílají dvakrát po sobě. Aplikace YouTube při přehrávání na
+první stisk jen ukáže ovládací lištu a akci provede až na druhý; obě klávesy jen nastavují
+stav, takže druhý stisk jinde neuškodí. `PlayPause` a `Confirm` přepínají, proto jdou
+jednou – v YouTube je při přehrávání stiskni dvakrát.
+
 ## Vývoj
 
 ```sh
